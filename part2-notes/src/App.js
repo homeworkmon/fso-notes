@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import './index.css'
 import Note from './components/Note'
 import LoginForm from './components/LoginForm'
 import Notification from './components/Notification'
@@ -6,12 +7,13 @@ import noteService from './services/note'
 import loginService from './services/login'
 
 const App = () => {
+  const [loginVisible, setLoginVisible] = useState(false)
   const [notes, setNotes] = useState([])
   const [newNote, setNewNote] = useState('')
   const [showAll, setShowAll] = useState(true)
   const [errorMessage, setErrorMessage] = useState(null)
   const [isError, setIsError] = useState(null)
-  const [user, setUser] = useState('')
+  const [user, setUser] = useState(null)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
 
@@ -23,7 +25,7 @@ const App = () => {
   }, [])
 
   useEffect(() => {
-    const loggedUserJSON = window.localStorage.getItem('loggedBlogUser')
+    const loggedUserJSON = window.localStorage.getItem('loggedNoteUser')
     if (loggedUserJSON) {
       const user = JSON.parse(loggedUserJSON)
       setUser(user.username)
@@ -40,10 +42,10 @@ const App = () => {
       })
 
       window.localStorage.setItem(
-        'loggedBlogUser', JSON.stringify(user)
+        'loggedNoteUser', JSON.stringify(user)
       )
       noteService.setToken(user.token)
-      setUsername(user.username)
+      setUser(user)
       setUsername('')
       setPassword('')
     } catch (exception) {
@@ -70,20 +72,57 @@ const App = () => {
     setNewNote('')
   }
 
+  const handleNoteChange = (event) => {
+    setNewNote(event.target.value)
+  }
+
+  const toggleImportanceOf = (id) => {
+    const note = notes.find(n => n.id === id)
+    const changedNote = { ...note, important: !note.important }
+
+    noteService
+      .update(id, changedNote)
+      .then(response => {
+        setNotes(notes.map(note => note.id !== id ? note : response.data))
+      })
+  }
+
   const handleLogout = () => {
     window.localStorage.removeItem('loggedBlogUser')
     setUser(null)
   }
 
-  /* const loginForm = () => {
-    const hideWhenVisible = { display: loginVisible ? 'none' : '' }
-    const showWhenVisible = { display: loginVisible ? '' : 'none' } */
+  const notesToShow = showAll
+    ? notes
+    : notes.filter(note => note.important === true)
 
-  {/* return (
+  const noteForm = () => {
+    return (
       <div>
-         <div style={hideWhenVisible}>
+        <div>{user.username} logged in
+          <button onClick={handleLogout}>log out</button>
+        </div>
+        <br></br>
+        <form onSubmit={addNote}>
+          <input
+            value={newNote}
+            onChange={handleNoteChange}
+          />
+          <button type="submit">save</button>
+        </form>
+      </div>
+    )
+  }
+
+  const loginForm = () => {
+    const hideWhenVisible = { display: loginVisible ? 'none' : '' }
+    const showWhenVisible = { display: loginVisible ? '' : 'none' }
+
+    return (
+      <div>
+        <div style={hideWhenVisible}>
           <button onClick={() => setLoginVisible(true)}>log in</button>
-    </div>
+        </div>
         <div style={showWhenVisible}>
           <LoginForm
             username={username}
@@ -92,39 +131,34 @@ const App = () => {
             handlePasswordChange={({ target }) => setPassword(target.value)}
             handleSubmit={handleLogin}
           />
-          <button onClick={() => setLoginVisible(false)}>login</button>
+          <button onClick={() => setLoginVisible(false)}>cancel</button>
         </div>
       </div>
     )
-  } */}
+  }
+
 
   return (
     <div>
-      <h1>Notes</h1>
+      <h2>Notes</h2>
+      <Notification message={errorMessage} isError={isError}/>
 
-      <Notification message={errorMessage} isError={isError} />
+      {user === null ?
+        loginForm() :
+        noteForm()
+      }
 
-      <form onSubmit={handleLogin}>
-        <div>
-            username
-          <input
-            type="text"
-            value={username}
-            name="Username"
-            onChange={({ target }) => setUsername(target.value)}
-          />
-        </div>
-        <div>
-            password
-          <input
-            type="password"
-            value={password}
-            name="Password"
-            onChange={({ target }) => setPassword(target.value)}
-          />
-        </div>
-        <button type="submit">login</button>
-      </form>
+      <div>
+        <button onClick={() => setShowAll(!showAll)}>
+          show {showAll ? 'important' : 'all' }
+        </button>
+      </div>
+
+      <ul>
+        {notesToShow.map(note =>
+          <Note key={note.id} note={note} toggleImportance={() => toggleImportanceOf(note.id)} />
+        )}
+      </ul>
     </div>
   )
 }
